@@ -1,32 +1,38 @@
-const path = require('path');
-const express = require('express');
-const {EventEmitter} = require('events');
-const http = require('http');
-const WebSocket = require('ws');
-const PORT = process.env.PORT || 3000;
-const app = express();
-const httpServer = http.createServer(app);
-const wsServer = new WebSocket.Server({ server: httpServer }, () => console.log(`Socket server at ws://localhost:${WS_PORT}`));
-const emitter = new EventEmitter();
-let   connectedClients = [];
+const fs = require('fs')
+const path = require('path')
+const express = require('express')
+const {EventEmitter} = require('events')
+const http = require('http')
+const WebSocket = require('ws')
+const PORT = process.env.PORT || 3000
+const app = express()
+const httpServer = http.createServer(app)
+const wsServer = new WebSocket.Server({ server: httpServer }, () => console.log(`Socket server at ws://localhost:${WS_PORT}`))
+const emitter = new EventEmitter()
+const cwd = process.cwd()
+const FPS = 10
+const timer = 1000 / FPS
+const imageQuality = 0.50
+let   framesReceived = 0
+let   connectedClients = []
 let   DATA = null
 const CLIENT = `<html><body><script>let image = new Image(); document.body.appendChild(image); const WS_URL = location.origin.replace(/^http/, 'ws'), ws = new WebSocket(WS_URL); ws.onmessage = message => image.src = URL.createObjectURL(message.data)</script></body></html>`
-const STREAM = `<script>
+const STREAM = `<html><body><script>
 (async () => {
         const   WS_URL  = location.origin.replace(/^http/, 'ws'), video = document.createElement('video'); video.setAttribute('autoplay',1)
-                video.srcObject = await navigator.mediaDevices.getUserMedia({video: {}})
+                video.srcObject = await navigator.mediaDevices.getUserMedia({video: true})
+                document.body.appendChild(video)
         let     canvas  = document.createElement('canvas');
         const getFrame  = (ws) => { 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
-                canvas.toBlob(blob => ws.send(blob),'image/jpeg', 0.50) 
+                canvas.toBlob(blob => ws.send(blob),'image/jpeg', ${imageQuality}) 
         }
         const ws = new WebSocket(WS_URL);
-        ws.onopen = () => setInterval(() => getFrame(ws), 400)
+        ws.onopen = () => setInterval(() => getFrame(ws), ${timer})
 })()
-</script>`
-
+</script></body></html>`
 wsServer.on('connection', (ws, req) => {
     connectedClients.push(ws);
     ws.on('message', data => {
@@ -35,6 +41,7 @@ wsServer.on('connection', (ws, req) => {
                 ws.send(data)
                 DATA = data
                 emitter.emit('frame')
+//                framesReceived++; fs.appendFileSync(`${cwd}/dvr/dvr.${framesReceived}.jpeg`,data)
             } else { connectedClients.splice(i, 1) }
         });
     });
