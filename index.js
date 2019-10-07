@@ -46,8 +46,6 @@ wsServer.on('connection', (ws, req) => {
         });
     });
 });
-
-
 app.get('/',         (req, res) => res.send(`Plese visit: <br />/streamer<br />/client<br />/mjpeg`))
 app.get('/streamer', (req, res) => res.send(STREAM))
 app.get('/client',   (req, res) => res.send(CLIENT))
@@ -63,5 +61,4 @@ app.get('/mjpeg',    (req, res) => {
     emitter.addListener('frame', writeFrame)
     res.addListener('close', () => { emitter.removeListener('frame', writeFrame) })
 })
-
 httpServer.listen(PORT, () => console.log(`HTTP server listening at http://localhost:${PORT}`))
