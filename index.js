@@ -1,21 +1,23 @@
-const fs = require('fs')
-const path = require('path')
-const express = require('express')
 const {EventEmitter} = require('events')
-const http = require('http')
-const WebSocket = require('ws')
-const PORT = process.env.PORT || 3000
-const app = express()
-const httpServer = http.createServer(app)
-const wsServer = new WebSocket.Server({ server: httpServer }, () => console.log(`Socket server at ws://localhost:${WS_PORT}`))
-const emitter = new EventEmitter()
-const cwd = process.cwd()
-const FPS = 10
-const timer = 1000 / FPS
-const imageQuality = 0.50
-let   framesReceived = 0
-let   connectedClients = []
-let   DATA = null
+const WebSocket      = require('ws')
+const https          = require('https')
+const fs             = require('fs')
+const path           = require('path')
+const express        = require('express')
+const PORT           = process.env.PORT || 3000
+const app            = express()
+const emitter        = new EventEmitter()
+const cert           = fs.readFileSync('/var/www/html/seqr.link/crt/certificate.pem')
+const key            = fs.readFileSync('/var/www/html/seqr.link/crt/key.pem')
+const server         = https.createServer({cert:cert,key:key},app)
+const wss            = new WebSocket.Server({ server })
+const cwd            = process.cwd()
+const FPS            = 2
+const timer          = 1000 / FPS
+const imageQuality   = 0.50
+let framesReceived   = 0
+let connectedClients = []
+let DATA             = null
 const CLIENT = `<html><body><script>let image = new Image(); document.body.appendChild(image); const WS_URL = location.origin.replace(/^http/, 'ws'), ws = new WebSocket(WS_URL); ws.onmessage = message => image.src = URL.createObjectURL(message.data)</script></body></html>`
 const STREAM = `<html><body><script>
 (async () => {
@@ -33,7 +35,8 @@ const STREAM = `<html><body><script>
         ws.onopen = () => setInterval(() => getFrame(ws), ${timer})
 })()
 </script></body></html>`
-wsServer.on('connection', (ws, req) => {
+
+wss.on('connection', (ws, req) => {
     connectedClients.push(ws);
     ws.on('message', data => {
         connectedClients.forEach((ws, i) => {
@@ -43,9 +46,10 @@ wsServer.on('connection', (ws, req) => {
                 emitter.emit('frame')
 //                framesReceived++; fs.appendFileSync(`${cwd}/dvr/dvr.${framesReceived}.jpeg`,data)
             } else { connectedClients.splice(i, 1) }
-        });
-    });
-});
+        })
+    })
+})
+
 app.get('/',         (req, res) => res.send(`Plese visit: <br />/streamer<br />/client<br />/mjpeg`))
 app.get('/streamer', (req, res) => res.send(STREAM))
 app.get('/client',   (req, res) => res.send(CLIENT))
@@ -61,4 +65,4 @@ app.get('/mjpeg',    (req, res) => {
     emitter.addListener('frame', writeFrame)
     res.addListener('close', () => { emitter.removeListener('frame', writeFrame) })
 })
-httpServer.listen(PORT, () => console.log(`HTTP server listening at http://localhost:${PORT}`))
+server.listen(PORT, () => console.log(`HTTP server listening at http://localhost:${PORT}`))
